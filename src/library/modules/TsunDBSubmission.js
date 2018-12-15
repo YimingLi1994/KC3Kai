@@ -804,7 +804,14 @@
 				|| ship.level < test.lvlRange[0]
 				|| ship.level > test.lvlRange[1])
 				return -2; // Wrong remodel/ship or wrong lvl
-			
+		
+			const wrongSetupWarning = function() {
+				if (KC3SortieManager.isOnSortie()) {
+					KC3Network.trigger("ModalBox", {
+						message: KC3Meta.term("TsunDBTestWrongSetupMessage"),
+					});
+				}
+			};
 			const equip = ship.equipment(true).filter((gear) => gear.masterId > 0);
 			const testEquip = test.equipment;
 			
@@ -817,9 +824,31 @@
 				}
 				return -2; // Missing required equip
 			}
-			
-			if(equip.length > 0)
-				return -2; // Too many equips, might ignore some equip types that don't affect acc
+
+			if (test.accuracy) {
+				let equipAcc = 0;
+				const accCheck = test.accuracy;
+				const stype = ship.master().api_stype;
+				for (let idx in equip) {
+					const eqType2 = equip[idx].master().api_type[2];
+					// Either radars or medium caliber guns on (F)BB(V) to adjust accuracy
+					if ([12.13].includes(eqType2) || (eqType2 === 2 && [8, 9, 10].includes(stype))) {
+						equipAcc += equip[idx].master().api_houm;
+					}
+					else {
+						wrongSetupWarning();
+						return -2; // Non-test related equipment
+					}
+				}
+				if (equipAcc < accCheck[0] || equipAcc > accCheck[1]) {
+					wrongSetupWarning();
+					return -2; // Too little or too much accuracy
+				}
+			}	
+			else if(equip.length > 0) {
+				wrongSetupWarning();
+				return -2; // Too many equips
+			}
 			
 			if(morale < test.moraleRange[0]
 				|| morale > test.moraleRange[1])
